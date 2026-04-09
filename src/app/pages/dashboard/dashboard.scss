@@ -1,0 +1,148 @@
+.stats-grid{
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:20px;
+  margin-bottom:24px;
+}
+
+.stat-card{
+  min-height:110px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.stat-title{
+  color:#64748b;
+  font-size:14px;
+  margin-bottom:8px;
+}
+
+.stat-value{
+  font-size:22px;
+  font-weight:800;
+  margin-bottom:6px;
+}
+
+.stat-sub{
+  color:#64748b;
+  font-size:12px;
+}
+
+.stat-icon{
+  width:48px;
+  height:48px;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  font-size:22px;
+}
+
+.stat-icon.blue{ background:#0ea5e9; }
+.stat-icon.green{ background:#22c55e; }
+.stat-icon.orange{ background:#f97316; }
+.stat-icon.pink{ background:#d946ef; }
+
+.activity-card{
+  padding:22px;
+
+  h2{
+    margin:0 0 18px;
+    font-size:20px;
+  }
+}
+
+.activity-list{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+.activity-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 16px;
+  border-radius:14px;
+  background:#f8fafc;
+}
+
+.activity-left{
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+
+.activity-icon{
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+}
+
+.activity-icon.green{
+  background:#dcfce7;
+  color:#166534;
+}
+
+.activity-icon.blue{
+  background:#dbeafe;
+  color:#1d4ed8;
+}
+
+.activity-icon.orange{
+  background:#ffedd5;
+  color:#c2410c;
+}
+
+.activity-icon.purple{
+  background:#f3e8ff;
+  color:#7e22ce;
+}
+
+.activity-name{
+  font-weight:700;
+  margin-bottom:4px;
+}
+
+.activity-text{
+  font-size:13px;
+  color:#64748b;
+}
+
+.activity-time{
+  font-size:13px;
+  color:#64748b;
+  white-space:nowrap;
+}
+
+@media (max-width: 1200px){
+  .stats-grid{
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px){
+  .stats-grid{
+    grid-template-columns: 1fr;
+  }
+
+  .activity-item{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:10px;
+  }
+}
+.empty-state {
+  padding: 24px;
+  text-align: center;
+  color: #64748b;
+  border: 1px dashed #dbe3ef;
+  border-radius: 16px;
+  background: #f8fafc;
+}

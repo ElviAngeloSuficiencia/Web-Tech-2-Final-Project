@@ -1,0 +1,209 @@
+<div class="container">
+  <div class="card add-credit-card">
+    <div class="add-credit-header">
+      <div class="wallet-icon">💳</div>
+      <div>
+        <h2>Add Time Credits</h2>
+        <p>Top up member account with time credits</p>
+      </div>
+    </div>
+
+    <div class="field member-field">
+  <label>Select Member</label>
+  <input
+    class="input"
+    type="text"
+    placeholder="Search member name, phone, or email"
+    [(ngModel)]="memberSearch"
+    (ngModelChange)="onMemberSearchChange()"
+    (focus)="onMemberFocus()"
+    (blur)="hideMemberResults()"
+  />
+
+  <div class="member-results" *ngIf="showMemberResults">
+    <button
+      type="button"
+      class="member-result-item"
+      *ngFor="let member of filteredMembers"
+      (mousedown)="selectMember(member)"
+    >
+      <div class="result-name">{{ member.name }}</div>
+      <div class="result-sub">{{ member.phone || member.email || 'No contact info' }}</div>
+    </button>
+
+    <div class="empty-search" *ngIf="filteredMembers.length === 0">
+      No matching members found
+    </div>
+  </div>
+</div>
+      <div class="field">
+        <label>Time Package</label>
+        <select class="input" [(ngModel)]="selectedPackageLabel">
+          <option value="">Choose package</option>
+          <option *ngFor="let p of packages" [value]="p.label">
+            {{ p.label }} — {{ formatPeso(p.amount) }}
+          </option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Payment Method</label>
+        <select class="input" [(ngModel)]="selectedPaymentMethod">
+          <option value="">Select method</option>
+          <option *ngFor="let method of paymentMethods" [value]="method">
+            {{ method }}
+          </option>
+        </select>
+      </div>
+
+      <div class="action-wrap">
+        <button class="btn btn-primary add-credit-btn" (click)="addCredit()">
+          Add Credit
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="packages-section">
+    <h2 class="section-title">Available Time Packages</h2>
+
+    <div class="packages-grid">
+      <div class="card package-card" *ngFor="let p of packages">
+        <div class="package-icon">🕒</div>
+        <div class="package-time">{{ p.label }}</div>
+        <div class="package-price">{{ formatPeso(p.amount) }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card transaction-card">
+    <div class="transaction-head">
+      <h2>Transaction History</h2>
+      <span class="count-badge">{{ filteredTransactions.length }} Transactions</span>
+    </div>
+
+    <div class="search-row">
+      <input
+        class="input"
+        placeholder="Search transactions..."
+        [(ngModel)]="historySearch"
+      />
+    </div>
+
+    <div class="table-wrap" *ngIf="filteredTransactions.length > 0; else emptyTransactions">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Transaction ID</th>
+            <th>Member</th>
+            <th>Time Added</th>
+            <th>Amount</th>
+            <th>Payment Method</th>
+            <th>Date &amp; Time</th>
+            <th>Receipt</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr *ngFor="let t of filteredTransactions">
+            <td>{{ formatTransactionId(t.id) }}</td>
+            <td>
+              <div class="member-name">{{ getMemberName(t.memberId) }}</div>
+              <div class="member-id" *ngIf="t.memberId !== null">{{ formatMemberId(t.memberId!) }}</div>
+            </td>
+            <td>{{ formatTimeAdded(t.timeAddedMinutes) }}</td>
+            <td class="amount">{{ formatPeso(t.amount) }}</td>
+            <td>
+              <span class="method-pill" [ngClass]="getMethodClass(t.paymentMethod)">
+                {{ t.paymentMethod || 'N/A' }}
+              </span>
+            </td>
+            <td>
+              <div>{{ formatDate(t.createdAt) }}</div>
+              <div class="sub-time">{{ formatTime(t.createdAt) }}</div>
+            </td>
+            <td>
+              <button type="button" class="btn btn-secondary btn-receipt" (click)="printTransactionReceipt(t)">
+                Receipt
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ng-template #emptyTransactions>
+      <div class="empty-state">
+        No transactions recorded yet.
+      </div>
+    </ng-template>
+  </div>
+
+  <div class="modal-backdrop" *ngIf="showMessageModal" (click)="closeMessageModal()">
+    <div class="modal-card card receipt-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ messageModalTitle }}</h2>
+        <button type="button" class="close-btn" (click)="closeMessageModal()">✕</button>
+      </div>
+
+      <div class="modal-form">
+        <p class="modal-message">{{ messageModalText }}</p>
+
+        <div class="receipt-preview" *ngIf="messageModalType === 'success' && receiptTransactionId">
+          <div class="receipt-row">
+            <span class="receipt-label">Receipt No.</span>
+            <span class="receipt-value">{{ receiptTransactionId }}</span>
+          </div>
+
+          <div class="receipt-row">
+            <span class="receipt-label">Member</span>
+            <span class="receipt-value">{{ receiptMemberName }}</span>
+          </div>
+
+          <div class="receipt-row">
+            <span class="receipt-label">Time Package</span>
+            <span class="receipt-value">{{ receiptPackageLabel }}</span>
+          </div>
+
+          <div class="receipt-row">
+            <span class="receipt-label">Amount</span>
+            <span class="receipt-value">{{ formatPeso(receiptAmount) }}</span>
+          </div>
+
+          <div class="receipt-row">
+            <span class="receipt-label">Payment Method</span>
+            <span class="receipt-value">{{ receiptPaymentMethod }}</span>
+          </div>
+
+          <div class="receipt-row">
+            <span class="receipt-label">Date</span>
+            <span class="receipt-value">{{ receiptDate }}</span>
+          </div>
+
+          <div class="receipt-row">
+            <span class="receipt-label">Time</span>
+            <span class="receipt-value">{{ receiptTime }}</span>
+          </div>
+        </div>
+
+        <div class="button-row modal-actions">
+          <button
+            *ngIf="messageModalType === 'success' && receiptTransactionId"
+            type="button"
+            class="btn btn-secondary"
+            (click)="printReceipt()"
+          >
+            Print Receipt
+          </button>
+
+          <button
+            type="button"
+            [class]="getMessageButtonClass()"
+            (click)="closeMessageModal()"
+          >
+            {{ messageModalType === 'success' ? 'Done' : 'OK' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
