@@ -6,6 +6,7 @@ import { db } from './db/mysql';
 import membersRoute from './routes/members';
 import computersRoute from './routes/computers';
 import paymentsRoute from './routes/payments';
+import authRoute from './routes/auth';
 
 config();
 
@@ -15,14 +16,14 @@ app.use(
   '*',
   cors({
     origin: 'http://localhost:4200',
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization']
   })
 );
 
 app.get('/', (c) => {
   return c.json({
-    message: 'Internet Cafe Hono API is running',
+    message: 'Internet Cafe backend is running',
     status: 'success'
   });
 });
@@ -57,6 +58,7 @@ app.get('/api/test-db', async (c) => {
   }
 });
 
+app.route('/api', authRoute);
 app.route('/api', membersRoute);
 app.route('/api', computersRoute);
 app.route('/api', paymentsRoute);

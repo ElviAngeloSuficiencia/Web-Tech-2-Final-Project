@@ -1,10 +1,24 @@
 <div class="container">
-  <h1 class="page-title">Dashboard</h1>
-  <p class="page-subtitle">Welcome back! Here's what's happening today.</p>
+  <div class="dashboard-header">
+    <div>
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-subtitle">Welcome back! Here's what's happening today.</p>
+    </div>
+
+    <div class="dashboard-status">
+      <span class="live-dot"></span>
+      <span class="live-text">Live Dashboard</span>
+    </div>
+  </div>
+
+  <div class="dashboard-meta">
+    <span class="meta-label">Last updated:</span>
+    <span class="meta-value">{{ debugMessage }}</span>
+  </div>
 
   <div class="stats-grid">
     <div class="card stat-card" *ngFor="let s of stats">
-      <div>
+      <div class="stat-content">
         <div class="stat-title">{{ s.title }}</div>
         <div class="stat-value">{{ s.value }}</div>
         <div class="stat-sub">{{ s.sub }}</div>
@@ -17,7 +31,10 @@
   </div>
 
   <div class="card activity-card">
-    <h2>Recent Activity</h2>
+    <div class="section-header">
+      <h2>Recent Activity</h2>
+      <span class="section-badge">Monitor</span>
+    </div>
 
     <div class="activity-list" *ngIf="activity.length > 0; else emptyActivity">
       <div class="activity-item" *ngFor="let a of activity">
@@ -38,7 +55,9 @@
 
     <ng-template #emptyActivity>
       <div class="empty-state">
-        No recent activity yet.
+        <div class="empty-icon">📡</div>
+        <div class="empty-title">No recent activity yet</div>
+        <div class="empty-text">New member, payment, and session events will appear here once connected.</div>
       </div>
     </ng-template>
   </div>

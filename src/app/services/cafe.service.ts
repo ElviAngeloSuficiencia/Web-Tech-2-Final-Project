@@ -56,6 +56,8 @@ export interface Transaction {
   providedIn: 'root'
 })
 export class CafeService {
+  private apiBaseUrl = 'http://localhost:3000/api';
+
   private members: Member[] = [];
 
   private computers: Computer[] = [
@@ -507,5 +509,161 @@ export class CafeService {
       completedSessions,
       todayRevenue
     };
+  }
+
+  private normalizeArrayResponse(payload: any): any[] {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.items)) return payload.items;
+    if (Array.isArray(payload?.result)) return payload.result;
+    return [];
+  }
+
+  private normalizeNumber(value: any): number {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : 0;
+  }
+
+  private isToday(value: any): boolean {
+    if (!value) return false;
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return false;
+    return date.toDateString() === new Date().toDateString();
+  }
+
+  async getDashboardSummaryFromApi(): Promise<{
+    totalMembers: number;
+    activeMembers: number;
+    totalComputers: number;
+    availableComputers: number;
+    occupiedComputers: number;
+    maintenanceComputers: number;
+    activeSessions: number;
+    completedSessions: number;
+    todayRevenue: number;
+  }> {
+    const fallback = {
+      totalMembers: 0,
+      activeMembers: 0,
+      totalComputers: 0,
+      availableComputers: 0,
+      occupiedComputers: 0,
+      maintenanceComputers: 0,
+      activeSessions: 0,
+      completedSessions: 0,
+      todayRevenue: 0
+    };
+
+    const fetchJsonWithTimeout = async (url: string, timeoutMs = 5000) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error(`Request failed for ${url} with status ${response.status}`);
+        }
+
+        return await response.json();
+      } catch (error) {
+        console.error('Fetch failed:', url, error);
+        return [];
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    try {
+      const [membersRaw, computersRaw, sessionsRaw, transactionsRaw] = await Promise.all([
+        fetchJsonWithTimeout(`${this.apiBaseUrl}/members`),
+        fetchJsonWithTimeout(`${this.apiBaseUrl}/computers`),
+        fetchJsonWithTimeout(`${this.apiBaseUrl}/sessions`),
+        fetchJsonWithTimeout(`${this.apiBaseUrl}/transactions`)
+      ]);
+
+      console.log('RAW members response:', membersRaw);
+      console.log('RAW computers response:', computersRaw);
+      console.log('RAW sessions response:', sessionsRaw);
+      console.log('RAW transactions response:', transactionsRaw);
+
+      const members = this.normalizeArrayResponse(membersRaw);
+      const computers = this.normalizeArrayResponse(computersRaw);
+      const sessions = this.normalizeArrayResponse(sessionsRaw);
+      const transactions = this.normalizeArrayResponse(transactionsRaw);
+
+      const totalMembers = members.length;
+
+      const activeMembers = members.filter(
+        (member: any) => String(member.status || '').toLowerCase() === 'active'
+      ).length;
+
+      const totalComputers = computers.length;
+
+      const availableComputers = computers.filter(
+        (computer: any) => String(computer.status || '').toLowerCase() === 'available'
+      ).length;
+
+      const occupiedComputers = computers.filter(
+        (computer: any) => String(computer.status || '').toLowerCase() === 'occupied'
+      ).length;
+
+      const maintenanceComputers = computers.filter(
+        (computer: any) => String(computer.status || '').toLowerCase() === 'maintenance'
+      ).length;
+
+      const activeSessions =
+        sessions.length > 0
+          ? sessions.filter(
+              (session: any) => String(session.status || '').toLowerCase() === 'active'
+            ).length
+          : occupiedComputers;
+
+      const completedSessions =
+        sessions.length > 0
+          ? sessions.filter(
+              (session: any) => String(session.status || '').toLowerCase() === 'completed'
+            ).length
+          : transactions.filter((transaction: any) =>
+              ['session_payment', 'session_end'].includes(
+                String(transaction.type || transaction.transaction_type || '').toLowerCase()
+              )
+            ).length;
+
+      const todayRevenue = transactions
+        .filter((transaction: any) =>
+          this.isToday(
+            transaction.createdAt ??
+            transaction.created_at ??
+            transaction.transaction_date ??
+            transaction.date
+          )
+        )
+        .reduce((sum: number, transaction: any) => {
+          return sum + this.normalizeNumber(transaction.amount);
+        }, 0);
+
+      const summary = {
+        totalMembers,
+        activeMembers,
+        totalComputers,
+        availableComputers,
+        occupiedComputers,
+        maintenanceComputers,
+        activeSessions,
+        completedSessions,
+        todayRevenue
+      };
+
+      console.log('Dashboard summary from API:', summary);
+
+      return summary;
+    } catch (error) {
+      console.error('Failed to load dashboard summary from API:', error);
+      return fallback;
+    }
   }
 }
