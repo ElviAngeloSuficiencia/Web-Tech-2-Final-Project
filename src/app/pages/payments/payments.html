@@ -8,59 +8,92 @@
       </div>
     </div>
 
-    <div class="field member-field">
-      <label>Select Member</label>
-      <input
-        class="input"
-        type="text"
-        placeholder="Search member name, phone, or email"
-        [(ngModel)]="memberSearch"
-        (ngModelChange)="onMemberSearchChange()"
-        (focus)="onMemberFocus()"
-        (blur)="hideMemberResults()"
-      />
+    <div class="credit-form-layout">
+      <div class="credit-form-grid">
+        <div class="field member-field field-span-2">
+          <label>Select Member</label>
+          <input
+            class="input"
+            type="text"
+            placeholder="Search member name, phone, or email"
+            [(ngModel)]="memberSearch"
+            (ngModelChange)="onMemberSearchChange()"
+            (focus)="onMemberFocus()"
+            (blur)="hideMemberResults()"
+          />
 
-      <div class="member-results" *ngIf="showMemberResults">
-        <button
-          type="button"
-          class="member-result-item"
-          *ngFor="let member of filteredMembers"
-          (mousedown)="selectMember(member)"
-        >
-          <div class="result-name">{{ member.name }}</div>
-          <div class="result-sub">{{ member.phone || member.email || 'No contact info' }}</div>
-        </button>
+          <div class="member-results" *ngIf="showMemberResults">
+            <button
+              type="button"
+              class="member-result-item"
+              *ngFor="let member of filteredMembers"
+              (mousedown)="selectMember(member)"
+            >
+              <div class="result-name">{{ member.name }}</div>
+              <div class="result-sub">{{ member.phone || member.email || 'No contact info' }}</div>
+            </button>
 
-        <div class="empty-search" *ngIf="filteredMembers.length === 0">
-          No matching members found
+            <div class="empty-search" *ngIf="filteredMembers.length === 0">
+              No matching members found
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Time Package</label>
+          <select class="input" [(ngModel)]="selectedPackageLabel">
+            <option value="">Choose package</option>
+            <option *ngFor="let p of packages" [value]="p.label">
+              {{ p.label }} — {{ formatPeso(p.amount) }}
+            </option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Payment Method</label>
+          <select class="input" [(ngModel)]="selectedPaymentMethod">
+            <option value="">Select method</option>
+            <option *ngFor="let method of paymentMethods" [value]="method">
+              {{ method }}
+            </option>
+          </select>
         </div>
       </div>
-    </div>
 
-    <div class="field">
-      <label>Time Package</label>
-      <select class="input" [(ngModel)]="selectedPackageLabel">
-        <option value="">Choose package</option>
-        <option *ngFor="let p of packages" [value]="p.label">
-          {{ p.label }} — {{ formatPeso(p.amount) }}
-        </option>
-      </select>
-    </div>
+      <div class="credit-summary-card">
+        <div class="summary-head">
+          <h3>Payment Summary</h3>
+          <p>Review before adding credit</p>
+        </div>
 
-    <div class="field">
-      <label>Payment Method</label>
-      <select class="input" [(ngModel)]="selectedPaymentMethod">
-        <option value="">Select method</option>
-        <option *ngFor="let method of paymentMethods" [value]="method">
-          {{ method }}
-        </option>
-      </select>
-    </div>
+        <div class="summary-body">
+          <div class="summary-row">
+            <span>Member</span>
+            <strong>{{ selectedMember?.name || 'Not selected' }}</strong>
+          </div>
 
-    <div class="action-wrap">
-      <button type="button" class="btn btn-primary add-credit-btn" (click)="addCredit()">
-        Add Credit
-      </button>
+          <div class="summary-row">
+            <span>Time Package</span>
+            <strong>{{ selectedPackage?.label || 'Not selected' }}</strong>
+          </div>
+
+          <div class="summary-row">
+            <span>Payment Method</span>
+            <strong>{{ selectedPaymentMethod || 'Not selected' }}</strong>
+          </div>
+
+          <div class="summary-row total-row">
+            <span>Amount</span>
+            <strong>{{ selectedPackage ? formatPeso(selectedPackage.amount) : '₱0' }}</strong>
+          </div>
+        </div>
+
+        <div class="summary-actions">
+          <button type="button" class="btn btn-primary add-credit-btn" (click)="addCredit()">
+            Add Credit
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
