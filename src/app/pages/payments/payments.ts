@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PaymentService } from '../../services/payment.service';
 
@@ -11,7 +11,7 @@ interface TimePackage {
 
 interface Member {
   id: number;
-  name: string;     
+  name: string;
   email?: string;
   phone?: string;
   balance: number;
@@ -65,6 +65,8 @@ export class PaymentsComponent implements OnInit {
   receiptDate = '';
   receiptTime = '';
 
+  isSubmitting = false;
+
   packages: TimePackage[] = [
     { label: '1h 0m', minutes: 60, amount: 15 },
     { label: '2h 0m', minutes: 120, amount: 25 },
@@ -75,7 +77,10 @@ export class PaymentsComponent implements OnInit {
 
   paymentMethods = ['Cash', 'GCash', 'Card'];
 
-  constructor(private paymentService: PaymentService) {}
+  constructor(
+    private paymentService: PaymentService,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit(): void {
     this.loadData();
@@ -104,13 +109,13 @@ export class PaymentsComponent implements OnInit {
           createdAt: row.created_at || row.createdAt || ''
         }));
 
-        this.filteredMembers = [];
-        console.log('Payments members loaded:', this.members);
+        this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('Failed to load members:', err);
         this.members = [];
         this.filteredMembers = [];
+        this.cdr.detectChanges();
       }
     });
 
@@ -130,10 +135,13 @@ export class PaymentsComponent implements OnInit {
           timeAddedMinutes: Number(row.time_added || 0),
           memberName: row.member_name || ''
         }));
+
+        this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('Failed to load transactions:', err);
         this.transactions = [];
+        this.cdr.detectChanges();
       }
     });
   }
@@ -151,7 +159,6 @@ export class PaymentsComponent implements OnInit {
   onMemberSearchChange(): void {
     const search = this.memberSearch.trim().toLowerCase();
 
-    // clear selected only if text no longer matches current selected member
     const selected = this.selectedMember;
     if (!selected || selected.name.trim().toLowerCase() !== search) {
       this.selectedMemberId = null;
@@ -160,6 +167,7 @@ export class PaymentsComponent implements OnInit {
     if (!search) {
       this.filteredMembers = [];
       this.showMemberResults = false;
+      this.cdr.detectChanges();
       return;
     }
 
@@ -172,9 +180,7 @@ export class PaymentsComponent implements OnInit {
     });
 
     this.showMemberResults = true;
-
-    console.log('Search text:', search);
-    console.log('Filtered members:', this.filteredMembers);
+    this.cdr.detectChanges();
   }
 
   onMemberFocus(): void {
@@ -183,6 +189,7 @@ export class PaymentsComponent implements OnInit {
     } else {
       this.showMemberResults = false;
       this.filteredMembers = [];
+      this.cdr.detectChanges();
     }
   }
 
@@ -191,6 +198,7 @@ export class PaymentsComponent implements OnInit {
     this.memberSearch = member.name;
     this.filteredMembers = [];
     this.showMemberResults = false;
+    this.cdr.detectChanges();
   }
 
   tryAutoSelectTypedMember(): void {
@@ -220,6 +228,7 @@ export class PaymentsComponent implements OnInit {
     this.messageModalText = text;
     this.messageModalType = type;
     this.showMessageModal = true;
+    this.cdr.detectChanges();
   }
 
   closeMessageModal(): void {
@@ -228,6 +237,7 @@ export class PaymentsComponent implements OnInit {
     this.messageModalText = '';
     this.messageModalType = 'success';
     this.clearReceiptDetails();
+    this.cdr.detectChanges();
   }
 
   clearReceiptDetails(): void {
@@ -251,6 +261,8 @@ export class PaymentsComponent implements OnInit {
   }
 
   addCredit(): void {
+    if (this.isSubmitting) return;
+
     this.tryAutoSelectTypedMember();
 
     if (!this.selectedMemberId) {
@@ -271,6 +283,8 @@ export class PaymentsComponent implements OnInit {
       return;
     }
 
+    this.isSubmitting = true;
+
     this.paymentService.addCredit({
       member_id: this.selectedMemberId,
       amount: this.selectedPackage.amount,
@@ -278,23 +292,41 @@ export class PaymentsComponent implements OnInit {
       time_added_minutes: this.selectedPackage.minutes
     }).subscribe({
       next: (res) => {
-        const tx = res?.data?.transaction || res?.transaction;
+        const tx = res?.data?.transaction;
+        const updatedMember = res?.data?.member;
 
         if (tx) {
           const mappedTx: Transaction = {
-            id: Number(tx.transaction_id ?? tx.id ?? 0),
-            type: tx.transaction_type || tx.type || '',
+            id: Number(tx.transaction_id ?? 0),
+            type: tx.transaction_type || '',
             amount: Number(tx.amount || 0),
             memberId: tx.member_id !== null && tx.member_id !== undefined ? Number(tx.member_id) : null,
             sessionId: tx.computer_id !== null && tx.computer_id !== undefined ? Number(tx.computer_id) : null,
             description: `Top-up for ${this.selectedMember?.name || 'Member'}`,
-            createdAt: tx.transaction_date || tx.created_at || '',
+            createdAt: tx.transaction_date || '',
             paymentMethod: tx.payment_method || '',
             timeAddedMinutes: Number(tx.time_added || 0),
             memberName: this.selectedMember?.name || ''
           };
 
+          this.transactions = [mappedTx, ...this.transactions];
           this.setReceiptDetailsFromTransaction(mappedTx);
+        }
+
+        if (updatedMember) {
+          this.members = this.members.map(member =>
+            member.id === Number(updatedMember.member_id)
+              ? {
+                  id: Number(updatedMember.member_id),
+                  name: updatedMember.name || '',
+                  phone: updatedMember.contact_number || '',
+                  email: updatedMember.email || '',
+                  balance: Number(updatedMember.remaining_time || 0),
+                  status: updatedMember.status || 'active',
+                  createdAt: updatedMember.created_at || ''
+                }
+              : member
+          );
         }
 
         this.memberSearch = '';
@@ -303,17 +335,22 @@ export class PaymentsComponent implements OnInit {
         this.selectedPaymentMethod = '';
         this.showMemberResults = false;
         this.filteredMembers = [];
+        this.isSubmitting = false;
 
-        this.loadData();
+        this.cdr.detectChanges();
         this.openMessageModal('Payment Successful', 'Credit added successfully.', 'success');
       },
       error: (err) => {
         console.error('Payment failed:', err);
         this.clearReceiptDetails();
+        this.isSubmitting = false;
+        this.cdr.detectChanges();
+
         const message =
           err?.error?.message ||
           err?.error?.error ||
           'Unable to add credit.';
+
         this.openMessageModal('Unable to Add Credit', message, 'error');
       }
     });
@@ -453,6 +490,7 @@ export class PaymentsComponent implements OnInit {
   hideMemberResults(): void {
     setTimeout(() => {
       this.showMemberResults = false;
+      this.cdr.detectChanges();
     }, 150);
   }
 }

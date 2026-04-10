@@ -5,7 +5,7 @@
       <p class="page-subtitle">Manage café members and their accounts</p>
     </div>
 
-    <button class="btn btn-primary add-btn" (click)="openModal()">
+    <button type="button" class="btn btn-primary add-btn" (click)="openModal()">
       Add Member
     </button>
   </div>
@@ -17,7 +17,7 @@
       disabled
     />
 
-    <button class="filter-btn" disabled>
+    <button type="button" class="filter-btn" disabled>
       Filter
     </button>
   </div>
@@ -30,7 +30,7 @@
           <th>Name</th>
           <th>Phone</th>
           <th>Email</th>
-          <th>Balance</th>
+          <th>Remaining Time</th>
           <th>Status</th>
           <th class="actions-col">Actions</th>
         </tr>
@@ -48,15 +48,15 @@
           <td>{{ m.name }}</td>
           <td>{{ m.phone || '-' }}</td>
           <td>{{ m.email || '-' }}</td>
-          <td>₱{{ m.balance }}</td>
+          <td>{{ formatRemainingTime(m.remainingTime) }}</td>
           <td>
             <span class="status-pill" [ngClass]="getStatusClass(m.status)">
               {{ m.status }}
             </span>
           </td>
           <td class="actions-col">
-            <button class="icon-btn" (click)="addTopUp(m.id)">💲</button>
-            <button class="icon-btn delete" (click)="deleteMember(m.id)">🗑️</button>
+            <button type="button" class="icon-btn" (click)="addTopUp(m.id)">💲</button>
+            <button type="button" class="icon-btn delete" (click)="deleteMember(m.id)">🗑️</button>
           </td>
         </tr>
       </tbody>
@@ -67,7 +67,7 @@
     <div class="modal-card card" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <h2>Add New Member</h2>
-        <button class="close-btn" (click)="closeModal()">✕</button>
+        <button type="button" class="close-btn" (click)="closeModal()">✕</button>
       </div>
 
       <div class="modal-form">
@@ -99,16 +99,16 @@
         </div>
 
         <div class="field">
-          <label>Starting Balance</label>
+          <label>Starting Time</label>
           <input
             class="input"
-            type="number"
-            placeholder="0"
-            [(ngModel)]="startingBalance"
+            type="text"
+            value="0h 0m"
+            disabled
           />
         </div>
 
-        <button class="btn btn-primary full-btn" (click)="addMember()">
+        <button type="button" class="btn btn-primary full-btn" (click)="addMember()">
           Add Member
         </button>
       </div>
