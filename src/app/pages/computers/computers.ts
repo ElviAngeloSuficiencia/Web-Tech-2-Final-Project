@@ -70,6 +70,7 @@ export class ComputersComponent implements OnInit, OnDestroy {
   private refreshHandle: ReturnType<typeof setInterval> | null = null;
   private clockHandle: ReturnType<typeof setInterval> | null = null;
   private isLoading = false;
+  private autoEndingComputerIds = new Set<number>();
 
   constructor(
     private computersService: ComputersService,
@@ -162,6 +163,12 @@ export class ComputersComponent implements OnInit, OnDestroy {
 
       this.updateStats();
       this.cdr.detectChanges();
+
+      for (const pc of this.computers) {
+        if (pc.status === 'occupied' && (pc.remainingSeconds ?? 0) <= 0) {
+          this.autoEndSession(pc.id);
+        }
+      }
     } catch (error) {
       console.error('Failed to load computers:', error);
     } finally {
@@ -223,15 +230,29 @@ export class ComputersComponent implements OnInit, OnDestroy {
 
   tickRemainingTime(): void {
     let changed = false;
+    const toAutoEnd: number[] = [];
 
     this.computers = this.computers.map(pc => {
-      if (pc.status === 'occupied' && (pc.remainingSeconds ?? 0) > 0) {
-        changed = true;
+      if (pc.status === 'occupied') {
+        const currentRemaining = Math.max(0, pc.remainingSeconds ?? 0);
 
-        return {
-          ...pc,
-          remainingSeconds: Math.max(0, (pc.remainingSeconds ?? 0) - 1)
-        };
+        if (currentRemaining > 0) {
+          const nextRemaining = Math.max(0, currentRemaining - 1);
+          changed = true;
+
+          if (nextRemaining === 0) {
+            toAutoEnd.push(pc.id);
+          }
+
+          return {
+            ...pc,
+            remainingSeconds: nextRemaining
+          };
+        }
+
+        if (currentRemaining === 0) {
+          toAutoEnd.push(pc.id);
+        }
       }
 
       return pc;
@@ -239,6 +260,33 @@ export class ComputersComponent implements OnInit, OnDestroy {
 
     if (changed) {
       this.cdr.detectChanges();
+    }
+
+    for (const computerId of toAutoEnd) {
+      this.autoEndSession(computerId);
+    }
+  }
+
+  async autoEndSession(computerId: number): Promise<void> {
+    if (this.autoEndingComputerIds.has(computerId)) {
+      return;
+    }
+
+    this.autoEndingComputerIds.add(computerId);
+
+    try {
+      console.log(`Auto-ending session for computer ${computerId}`);
+
+      await firstValueFrom(
+        this.computersService.endSession(computerId)
+      );
+
+      await this.loadComputers();
+    } catch (error: any) {
+      console.error(`Failed to auto-end session for computer ${computerId}:`, error);
+      console.error('Auto end API error response:', error?.error);
+    } finally {
+      this.autoEndingComputerIds.delete(computerId);
     }
   }
 
