@@ -150,14 +150,14 @@ export class ComputersComponent implements OnInit, OnDestroy {
         id: Number(row.id ?? row.computer_id ?? 0),
         name: row.name ?? row.computer_name ?? 'Unnamed PC',
         ratePerHour: Number(row.ratePerHour ?? row.rate_per_hour ?? 25),
-        status: (row.status ?? 'available') as ComputerStatus,
+        status: this.normalizeComputerStatus(row.status),
         specs: row.specs ?? '',
         memberId: row.memberId ?? row.member_id ?? null,
         customerName: row.customerName ?? row.customer_name ?? '',
         timeStarted: row.timeStarted ?? row.time_started ?? null,
         timeEnded: row.timeEnded ?? row.time_ended ?? null,
-        remainingSeconds: Number(row.remainingSeconds ?? row.remaining_seconds ?? 0),
-        amountPaid: Number(row.amountPaid ?? row.amount_paid ?? 0)
+        amountPaid: Number(row.amountPaid ?? row.amount_paid ?? 0),
+        remainingSeconds: this.computeRemainingSecondsFromRow(row)
       }));
 
       this.updateStats();
@@ -169,30 +169,89 @@ export class ComputersComponent implements OnInit, OnDestroy {
     }
   }
 
+  normalizeComputerStatus(status: any): ComputerStatus {
+    const value = String(status ?? 'available').toLowerCase().trim();
+
+    if (value === 'occupied' || value === 'in_use' || value === 'in use') {
+      return 'occupied';
+    }
+
+    if (value === 'maintenance') {
+      return 'maintenance';
+    }
+
+    if (value === 'offline') {
+      return 'offline';
+    }
+
+    return 'available';
+  }
+
+  computeRemainingSecondsFromRow(row: any): number {
+    const status = this.normalizeComputerStatus(row.status);
+
+    const amountPaid = Number(row.amountPaid ?? row.amount_paid ?? 0);
+    const ratePerHour = Number(row.ratePerHour ?? row.rate_per_hour ?? 25);
+
+    const rawStarted =
+      row.timeStarted ??
+      row.time_started ??
+      null;
+
+    const backendRemaining = Number(row.remainingSeconds ?? row.remaining_seconds ?? 0);
+
+    if (status !== 'occupied') {
+      return Math.max(0, backendRemaining);
+    }
+
+    if (!rawStarted || !amountPaid || !ratePerHour) {
+      return Math.max(0, backendRemaining);
+    }
+
+    const startedAt = new Date(rawStarted);
+
+    if (isNaN(startedAt.getTime())) {
+      return Math.max(0, backendRemaining);
+    }
+
+    const totalSeconds = Math.floor((amountPaid / ratePerHour) * 3600);
+    const elapsedSeconds = Math.floor((Date.now() - startedAt.getTime()) / 1000);
+    const computedRemaining = Math.max(0, totalSeconds - elapsedSeconds);
+
+    return computedRemaining;
+  }
+
   tickRemainingTime(): void {
+    let changed = false;
+
     this.computers = this.computers.map(pc => {
       if (pc.status === 'occupied' && (pc.remainingSeconds ?? 0) > 0) {
+        changed = true;
+
         return {
           ...pc,
           remainingSeconds: Math.max(0, (pc.remainingSeconds ?? 0) - 1)
         };
       }
+
       return pc;
     });
 
-    this.cdr.detectChanges();
+    if (changed) {
+      this.cdr.detectChanges();
+    }
   }
 
   isInUse(status: string): boolean {
-    return status === 'occupied';
+    return this.normalizeComputerStatus(status) === 'occupied';
   }
 
   isAvailable(status: string): boolean {
-    return status === 'available';
+    return this.normalizeComputerStatus(status) === 'available';
   }
 
   isMaintenance(status: string): boolean {
-    return status === 'maintenance';
+    return this.normalizeComputerStatus(status) === 'maintenance';
   }
 
   openAddComputerModal(): void {
@@ -239,6 +298,7 @@ export class ComputersComponent implements OnInit, OnDestroy {
     } catch (error: any) {
       console.error('Failed to add computer:', error);
       console.error('Add computer API error response:', error?.error);
+
       alert(
         error?.error?.message ||
         error?.message ||
@@ -336,6 +396,8 @@ export class ComputersComponent implements OnInit, OnDestroy {
     if (!this.selectedComputer) return;
 
     const customerName = this.computedCustomerName;
+    const computedMinutes = this.computedMinutes;
+    const remainingSeconds = computedMinutes * 60;
 
     if (!customerName) {
       alert('Please select a member or enter a walk-in name.');
@@ -347,14 +409,23 @@ export class ComputersComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (computedMinutes <= 0 || remainingSeconds <= 0) {
+      alert('Computed play time must be greater than zero.');
+      return;
+    }
+
     const payload = {
       memberId: this.selectedMemberId,
-      customerName: customerName,
+      customerName,
       amountPaid: this.amountPaid,
+      minutesPurchased: computedMinutes,
+      remainingSeconds,
 
       member_id: this.selectedMemberId,
       customer_name: customerName,
-      amount_paid: this.amountPaid
+      amount_paid: this.amountPaid,
+      minutes_purchased: computedMinutes,
+      remaining_seconds: remainingSeconds
     };
 
     console.log('Starting session payload:', payload);
@@ -452,18 +523,24 @@ export class ComputersComponent implements OnInit, OnDestroy {
   }
 
   getComputerStatusLabel(status: string): string {
-    if (status === 'occupied') return 'In Use';
-    if (status === 'available') return 'Available';
-    if (status === 'maintenance') return 'Maintenance';
-    if (status === 'offline') return 'Offline';
+    const normalized = this.normalizeComputerStatus(status);
+
+    if (normalized === 'occupied') return 'In Use';
+    if (normalized === 'available') return 'Available';
+    if (normalized === 'maintenance') return 'Maintenance';
+    if (normalized === 'offline') return 'Offline';
+
     return status;
   }
 
   getStatusClass(status: string): string {
-    if (status === 'occupied') return 'tag-in-use';
-    if (status === 'available') return 'tag-available';
-    if (status === 'maintenance') return 'tag-maintenance';
-    if (status === 'offline') return 'tag-offline';
+    const normalized = this.normalizeComputerStatus(status);
+
+    if (normalized === 'occupied') return 'tag-in-use';
+    if (normalized === 'available') return 'tag-available';
+    if (normalized === 'maintenance') return 'tag-maintenance';
+    if (normalized === 'offline') return 'tag-offline';
+
     return '';
   }
 
@@ -510,7 +587,7 @@ export class ComputersComponent implements OnInit, OnDestroy {
     const pc = this.computers.find(item => item.id === computerId);
 
     if (!pc?.ratePerHour || !pc?.amountPaid) {
-      return '0:00';
+      return '0h 0m';
     }
 
     const totalMinutes = Math.floor((pc.amountPaid / pc.ratePerHour) * 60);
@@ -534,9 +611,9 @@ export class ComputersComponent implements OnInit, OnDestroy {
 
   updateStats(): void {
     const total = this.computers.length;
-    const inUse = this.computers.filter(pc => pc.status === 'occupied').length;
-    const available = this.computers.filter(pc => pc.status === 'available').length;
-    const maintenance = this.computers.filter(pc => pc.status === 'maintenance').length;
+    const inUse = this.computers.filter(pc => this.normalizeComputerStatus(pc.status) === 'occupied').length;
+    const available = this.computers.filter(pc => this.normalizeComputerStatus(pc.status) === 'available').length;
+    const maintenance = this.computers.filter(pc => this.normalizeComputerStatus(pc.status) === 'maintenance').length;
 
     this.stats = [
       { label: 'Total Stations', value: total.toString(), icon: '🖥️' },
