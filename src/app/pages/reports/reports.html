@@ -1,0 +1,90 @@
+<div class="container">
+  <div class="stats-grid">
+    <div class="card stat-card" *ngFor="let s of stats">
+      <div>
+        <div class="stat-label">{{ s.label }}</div>
+        <div class="stat-value">{{ s.value }}</div>
+        <div class="stat-note" [ngClass]="s.noteClass">{{ s.note }}</div>
+      </div>
+      <div class="stat-icon">{{ s.icon }}</div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="card chart-card">
+      <h2>Daily Revenue</h2>
+
+      <div class="bar-chart">
+        <div class="bar-col" *ngFor="let value of revenueBars; let i = index">
+          <div class="bar-value">{{ formatPeso(value) }}</div>
+          <div class="bar" [style.height.px]="getBarHeight(value)"></div>
+          <span>{{ days[i] }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card chart-card">
+      <h2>Session Trends</h2>
+
+      <div class="line-chart">
+        <div class="line-grid"></div>
+
+        <div
+          class="point"
+          *ngFor="let value of sessionTrend; let i = index"
+          [style.left.%]="(i / 6) * 100"
+          [style.bottom.px]="getPointBottom(value)"
+          [attr.title]="value + ' sessions'"
+        ></div>
+
+        <div class="line-labels">
+          <span *ngFor="let d of days">{{ d }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-grid">
+    <div class="card members-card">
+      <h2>Most Active Members</h2>
+
+      <div class="member-row" *ngFor="let m of activeMembers">
+        <div class="rank">{{ m.rank }}</div>
+
+        <div class="member-info">
+          <div class="member-name">{{ m.name }}</div>
+          <div class="member-meta">{{ m.sessions }} sessions • {{ m.hours }} hours</div>
+        </div>
+
+        <div class="member-bar">
+          <div class="member-fill" [style.width.%]="m.width"></div>
+        </div>
+      </div>
+
+      <div class="empty-state" *ngIf="activeMembers.length === 0">
+        No member session activity yet.
+      </div>
+    </div>
+
+    <div class="card usage-card">
+      <h2>Payment Method Distribution</h2>
+
+      <div class="donut-wrap">
+        <div class="donut" [style.background]="donutStyle">
+          <div class="donut-center">Payments</div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item" *ngFor="let item of usageDistribution">
+          <span class="dot" [ngClass]="item.colorClass"></span>
+          {{ item.label }} ({{ item.percent }}%)
+        </div>
+      </div>
+
+      <div class="empty-state small" *ngIf="usageDistribution.length === 0">
+        No payment data yet.
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,42 @@
+<div class="container">
+  <div class="hero card">
+    <div>
+      <div class="hero-title">10 Active Sessions</div>
+      <div class="hero-sub">Currently being monitored</div>
+    </div>
+
+    <div class="hero-icon">🕒</div>
+  </div>
+
+  <div class="session-grid">
+    <div class="card session-card" *ngFor="let s of sessions">
+      <div class="session-head">
+        <div class="session-icon">🖥️</div>
+
+        <div>
+          <div class="session-pc">{{ s.pc }}</div>
+          <div class="session-id">Session {{ s.sid }}</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="session-member">👤 {{ s.member }} <span>({{ s.mid }})</span></div>
+      <div class="session-start">🕒 Started at {{ s.start }}</div>
+
+      <div class="progress-label-row">
+        <span>Time Remaining</span>
+        <strong>{{ formatMinutes(s.remainingMin) }}</strong>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="progress(s)"></div>
+      </div>
+
+      <div class="progress-time-row">
+        <span>0:00</span>
+        <span>{{ formatMinutes(s.totalMin) }}</span>
+      </div>
+    </div>
+  </div>
+</div>

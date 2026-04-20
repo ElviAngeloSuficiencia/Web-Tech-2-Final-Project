@@ -75,8 +75,6 @@ interface ComputerRow {
   amountPaid: number;
 }
 
-type SessionTrendView = 'daily' | 'weekly' | 'monthly';
-
 @Component({
   selector: 'app-reports',
   standalone: true,
@@ -92,7 +90,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
   sessionTrend: number[] = [];
   sessionTrendLabels: string[] = [];
-  sessionTrendView: SessionTrendView = 'daily';
+  selectedTrendDate = this.getTodayInputValue();
 
   activeMembers: ActiveMemberRow[] = [];
   usageDistribution: UsageSlice[] = [];
@@ -125,6 +123,27 @@ export class ReportsComponent implements OnInit, OnDestroy {
       clearInterval(this.refreshHandle);
       this.refreshHandle = null;
     }
+  }
+
+  private getTodayInputValue(): string {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  formatSelectedTrendDate(): string {
+    if (!this.selectedTrendDate) return 'Select date';
+
+    const date = new Date(this.selectedTrendDate);
+    if (Number.isNaN(date.getTime())) return 'Select date';
+
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
   }
 
   private normalizeArrayResponse(payload: any): any[] {
@@ -243,29 +262,79 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   updateSessionTrendChart(): void {
-    if (this.sessionTrendView === 'daily') {
-      const daily = this.getLastNDaysTrend(this.allSessions, 7);
-      this.sessionTrendLabels = daily.labels;
-      this.sessionTrend = daily.values;
-    } else if (this.sessionTrendView === 'weekly') {
-      const weekly = this.getLastNWeeksTrend(this.allSessions, 6);
-      this.sessionTrendLabels = weekly.labels;
-      this.sessionTrend = weekly.values;
-    } else {
-      const monthly = this.getLastNMonthsTrend(this.allSessions, 6);
-      this.sessionTrendLabels = monthly.labels;
-      this.sessionTrend = monthly.values;
-    }
-
+    const trend = this.getTrendAroundSelectedDate(this.allSessions, this.selectedTrendDate, 7);
+    this.sessionTrendLabels = trend.labels;
+    this.sessionTrend = trend.values;
     this.maxSessions = Math.max(...this.sessionTrend, 1);
   }
 
   getPointLeft(index: number): number {
     if (this.sessionTrend.length <= 1) {
-      return 0;
+      return 50;
     }
 
     return (index / (this.sessionTrend.length - 1)) * 100;
+  }
+
+  getPointBottom(value: number): number {
+    return (value / this.maxSessions) * 220;
+  }
+
+  getSessionTrendPolylinePoints(): string {
+    if (!this.sessionTrend.length) return '';
+
+    return this.sessionTrend
+      .map((value, index) => {
+        const x =
+          this.sessionTrend.length === 1
+            ? 50
+            : (index / (this.sessionTrend.length - 1)) * 100;
+
+        const y = 100 - (value / this.maxSessions) * 100;
+
+        return `${x},${y}`;
+      })
+      .join(' ');
+  }
+
+  getSessionTrendAreaPoints(): string {
+    if (!this.sessionTrend.length) return '';
+
+    const linePoints = this.getSessionTrendPolylinePoints();
+    return `0,100 ${linePoints} 100,100`;
+  }
+
+  private getTrendAroundSelectedDate(
+    sessions: SessionRow[],
+    selectedDateString: string,
+    count: number
+  ): { labels: string[]; values: number[] } {
+    const endDate = selectedDateString ? new Date(selectedDateString) : new Date();
+    endDate.setHours(0, 0, 0, 0);
+
+    const ranges: Array<{ date: Date; label: string }> = [];
+
+    for (let i = count - 1; i >= 0; i--) {
+      const date = new Date(endDate);
+      date.setDate(endDate.getDate() - i);
+
+      ranges.push({
+        date,
+        label: date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric'
+        })
+      });
+    }
+
+    return {
+      labels: ranges.map(item => item.label),
+      values: ranges.map(item =>
+        sessions.filter(session =>
+          this.isSameDay(new Date(session.startTime), item.date)
+        ).length
+      )
+    };
   }
 
   private mapMembers(rows: any[]): MemberRow[] {
@@ -389,8 +458,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
     const previousRevenue = this.sumRevenueForDays(transactions, previous7Days);
 
     const currentSessions = this.countSessionsForDays(sessions, current7Days);
-    const previousSessions = this.countSessionsForDays(sessions, previous7Days);
-
     const activeMembers = members.filter(
       member => String(member.status).toLowerCase() === 'active'
     ).length;
@@ -399,7 +466,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
     const previousAvgMinutes = this.getAverageSessionMinutesForDays(sessions, previous7Days);
 
     const revenueDiff = this.getPercentChange(currentRevenue, previousRevenue);
-    const sessionDiff = this.getPercentChange(currentSessions, previousSessions);
     const avgMinuteDiff = Math.round(currentAvgMinutes - previousAvgMinutes);
 
     const liveOccupied = computers.filter(
@@ -411,7 +477,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
         label: 'Weekly Revenue',
         value: this.formatPeso(currentRevenue),
         note: this.buildChangeText(revenueDiff, 'vs previous 7 days'),
-        icon: '💲',
+        icon: '₱',
         noteClass: revenueDiff >= 0 ? 'green' : 'orange'
       },
       {
@@ -560,85 +626,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
     return days;
   }
 
-  private getLastNDaysTrend(
-    sessions: SessionRow[],
-    count: number
-  ): { labels: string[]; values: number[] } {
-    const ranges = this.getLastNDays(count, 0);
-
-    return {
-      labels: ranges.map(item => item.label),
-      values: ranges.map(item =>
-        sessions.filter(session =>
-          this.isSameDay(new Date(session.startTime), item.date)
-        ).length
-      )
-    };
-  }
-
-  private getLastNWeeksTrend(
-    sessions: SessionRow[],
-    count: number
-  ): { labels: string[]; values: number[] } {
-    const labels: string[] = [];
-    const values: number[] = [];
-    const today = new Date();
-
-    for (let i = count - 1; i >= 0; i--) {
-      const end = new Date(today);
-      end.setHours(23, 59, 59, 999);
-      end.setDate(today.getDate() - (i * 7));
-
-      const start = new Date(end);
-      start.setHours(0, 0, 0, 0);
-      start.setDate(end.getDate() - 6);
-
-      labels.push(`Week ${count - i}`);
-
-      values.push(
-        sessions.filter(session => {
-          const sessionDate = new Date(session.startTime);
-          return sessionDate >= start && sessionDate <= end;
-        }).length
-      );
-    }
-
-    return { labels, values };
-  }
-
-  private getLastNMonthsTrend(
-    sessions: SessionRow[],
-    count: number
-  ): { labels: string[]; values: number[] } {
-    const labels: string[] = [];
-    const values: number[] = [];
-    const now = new Date();
-
-    for (let i = count - 1; i >= 0; i--) {
-      const target = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const year = target.getFullYear();
-      const month = target.getMonth();
-
-      labels.push(
-        target.toLocaleDateString('en-US', {
-          month: 'short'
-        })
-      );
-
-      values.push(
-        sessions.filter(session => {
-          const sessionDate = new Date(session.startTime);
-          return (
-            sessionDate.getFullYear() === year &&
-            sessionDate.getMonth() === month
-          );
-        }).length
-      );
-    }
-
-    return { labels, values };
-  }
-
   sumRevenueForDays(
     transactions: TransactionRow[],
     days: Array<{ date: Date; label: string }>
@@ -703,10 +690,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
   getBarHeight(value: number): number {
     return (value / this.maxRevenue) * 260;
-  }
-
-  getPointBottom(value: number): number {
-    return (value / this.maxSessions) * 220;
   }
 
   formatPeso(amount: number): string {

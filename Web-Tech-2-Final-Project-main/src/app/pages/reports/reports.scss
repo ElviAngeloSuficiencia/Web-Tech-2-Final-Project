@@ -117,6 +117,92 @@
   background-size: calc(100% / 6) 25%, 100% 25%;
 }
 
+.trend-date-button{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 12px;
+  border:1px solid #d1d5db;
+  border-radius:10px;
+  background:#fff;
+  color:#0f172a;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  min-width:170px;
+  justify-content:center;
+  transition:0.2s ease;
+}
+
+.trend-date-button:hover{
+  border-color:#93c5fd;
+  box-shadow:0 2px 8px rgba(59, 130, 246, 0.12);
+}
+
+.calendar-icon{
+  font-size:15px;
+  line-height:1;
+}
+
+.trend-date-native{
+  position:absolute;
+  inset:0;
+  opacity:0;
+  cursor:pointer;
+  width:100%;
+  height:100%;
+}
+
+.trend-date-native::-webkit-calendar-picker-indicator{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  margin:0;
+  padding:0;
+  cursor:pointer;
+}
+
+.trend-date-caption{
+  margin:-2px 0 10px;
+  color:#64748b;
+  font-size:13px;
+  font-weight:600;
+}
+
+.enhanced-line-chart{
+  position:relative;
+  overflow:visible;
+}
+
+.trend-svg{
+  position:absolute;
+  left:10px;
+  right:10px;
+  top:20px;
+  bottom:40px;
+  width:calc(100% - 20px);
+  height:calc(100% - 60px);
+  pointer-events:none;
+  z-index:1;
+  overflow:visible;
+}
+
+.trend-line{
+  fill:none;
+  stroke:#3b82f6;
+  stroke-width:2.5;
+  vector-effect:non-scaling-stroke;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  filter:drop-shadow(0 4px 10px rgba(59, 130, 246, 0.18));
+}
+
+.trend-area{
+  fill:url(#sessionTrendFill);
+}
+
 .point{
   position:absolute;
   width:12px;
@@ -125,6 +211,34 @@
   background:#3b82f6;
   transform:translate(-50%, 50%);
   z-index:2;
+}
+
+.enhanced-point{
+  background:#3b82f6;
+  border:3px solid #ffffff;
+  box-shadow:0 4px 10px rgba(59, 130, 246, 0.25);
+}
+
+.point-badge{
+  position:absolute;
+  bottom:18px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#0f172a;
+  color:#fff;
+  font-size:11px;
+  font-weight:700;
+  line-height:1;
+  padding:4px 6px;
+  border-radius:6px;
+  white-space:nowrap;
+  opacity:0;
+  transition:0.2s ease;
+  pointer-events:none;
+}
+
+.enhanced-point:hover .point-badge{
+  opacity:1;
 }
 
 .line-labels{
@@ -307,5 +421,19 @@
 
   .member-bar{
     width:100%;
+  }
+
+  .line-labels{
+    font-size:12px;
+  }
+
+  .point-badge{
+    font-size:10px;
+    padding:4px 5px;
+  }
+
+  .trend-date-button{
+    min-width:150px;
+    font-size:13px;
   }
 }

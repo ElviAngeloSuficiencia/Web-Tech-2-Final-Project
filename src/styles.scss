@@ -1,0 +1,76 @@
+/* GLOBAL RESET */
+
+*{
+  box-sizing: border-box;
+}
+
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background:#f6f8fb;
+  color:#0f172a;
+}
+
+/* PAGE */
+
+.page-title{
+  font-size:32px;
+  font-weight:700;
+}
+
+.page-subtitle{
+  color:#64748b;
+  margin-top:4px;
+}
+
+/* CARDS */
+
+.card{
+  background:white;
+  border-radius:16px;
+  padding:20px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.06);
+}
+
+/* BUTTONS */
+
+.btn{
+  border:none;
+  padding:10px 16px;
+  border-radius:10px;
+  cursor:pointer;
+}
+
+.btn-primary{
+  background:linear-gradient(90deg,#00b894,#00a6ff);
+  color:white;
+}
+
+/* INPUT */
+
+.input{
+  width:100%;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid #e5e7eb;
+  background:#f3f6fb;
+}
+
+/* TABLE */
+
+.table{
+  width:100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td{
+  padding:12px;
+  border-bottom:1px solid #e5e7eb;
+  text-align:left;
+}
+
+.table th{
+  color:#64748b;
+  font-weight:600;
+}

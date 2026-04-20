@@ -1,0 +1,117 @@
+<div class="container">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Member Management</h1>
+      <p class="page-subtitle">Manage café members and their accounts</p>
+    </div>
+
+    <button type="button" class="btn btn-primary add-btn" (click)="openModal()">
+      Add Member
+    </button>
+  </div>
+
+  <div class="toolbar card">
+    <input
+      class="input search-input"
+      placeholder="Search will be added next..."
+      disabled
+    />
+
+    <button type="button" class="filter-btn" disabled>
+      Filter
+    </button>
+  </div>
+
+  <div class="card table-card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Member ID</th>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th>Remaining Time</th>
+          <th>Status</th>
+          <th class="actions-col">Actions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr *ngIf="members.length === 0">
+          <td colspan="7" style="text-align: center; padding: 24px;">
+            No members yet. Add your first real member.
+          </td>
+        </tr>
+
+        <tr *ngFor="let m of members">
+          <td>{{ m.id }}</td>
+          <td>{{ m.name }}</td>
+          <td>{{ m.phone || '-' }}</td>
+          <td>{{ m.email || '-' }}</td>
+          <td>{{ formatRemainingTime(m.remainingTime) }}</td>
+          <td>
+            <span class="status-pill" [ngClass]="getStatusClass(m.status)">
+              {{ m.status }}
+            </span>
+          </td>
+          <td class="actions-col">
+            <button type="button" class="icon-btn" (click)="addTopUp(m.id)">💲</button>
+            <button type="button" class="icon-btn delete" (click)="deleteMember(m.id)">🗑️</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal-backdrop" *ngIf="showModal" (click)="closeModal()">
+    <div class="modal-card card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Add New Member</h2>
+        <button type="button" class="close-btn" (click)="closeModal()">✕</button>
+      </div>
+
+      <div class="modal-form">
+        <div class="field">
+          <label>Full Name</label>
+          <input
+            class="input"
+            placeholder="Enter member name"
+            [(ngModel)]="name"
+          />
+        </div>
+
+        <div class="field">
+          <label>Contact Number</label>
+          <input
+            class="input"
+            placeholder="09XXXXXXXXX"
+            [(ngModel)]="contact"
+          />
+        </div>
+
+        <div class="field">
+          <label>Email Address</label>
+          <input
+            class="input"
+            placeholder="member@example.com"
+            [(ngModel)]="email"
+          />
+        </div>
+
+        <div class="field">
+          <label>Starting Time</label>
+          <input
+            class="input"
+            type="text"
+            value="0h 0m"
+            disabled
+          />
+        </div>
+
+        <button type="button" class="btn btn-primary full-btn" (click)="addMember()">
+          Add Member
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
