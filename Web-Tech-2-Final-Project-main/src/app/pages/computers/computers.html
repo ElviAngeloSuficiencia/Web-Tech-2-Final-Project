@@ -1,0 +1,308 @@
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Computer Stations</h1>
+      <p class="page-subtitle">Monitor and manage all computer stations</p>
+    </div>
+
+    <div class="page-actions">
+      <button type="button" class="btn btn-primary" (click)="openAddComputerModal()">
+        Add Computer
+      </button>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card card" *ngFor="let s of stats">
+      <div class="stat-content">
+        <div class="stat-label">{{ s.label }}</div>
+        <div class="stat-value">{{ s.value }}</div>
+      </div>
+      <div class="stat-icon">{{ s.icon }}</div>
+    </div>
+  </div>
+
+  <div class="pc-grid">
+    <div
+      class="pc-card card"
+      *ngFor="let pc of computers"
+      [ngClass]="{
+        'state-in-use': isInUse(pc.status),
+        'state-available': isAvailable(pc.status),
+        'state-maintenance': isMaintenance(pc.status)
+      }"
+    >
+      <div class="pc-header">
+        <div class="pc-left">
+          <div class="pc-icon">🖥️</div>
+          <div>
+            <div class="pc-name">{{ pc.name }}</div>
+            <div class="pc-subtext">Rate: ₱{{ pc.ratePerHour }}/hr</div>
+            <div class="pc-subtext" *ngIf="pc.specs">{{ pc.specs }}</div>
+          </div>
+        </div>
+
+        <span class="status-badge" [ngClass]="getStatusClass(pc.status)">
+          {{ getComputerStatusLabel(pc.status) }}
+        </span>
+      </div>
+
+      <div class="pc-divider"></div>
+
+      <div class="pc-body" *ngIf="isInUse(pc.status)">
+        <div class="info-row">
+          <span class="info-label">Customer</span>
+          <span class="info-value">{{ getComputerUser(pc.id) }}</span>
+        </div>
+
+        <div class="info-row">
+          <span class="info-label">Started</span>
+          <span class="info-value">{{ getComputerStarted(pc.id) }}</span>
+        </div>
+
+        <div class="progress-label-row">
+          <span class="info-label">Time Remaining</span>
+          <strong class="progress-remaining">{{ getComputerRemainingTime(pc.id) }}</strong>
+        </div>
+
+        <div class="progress-bar">
+          <div class="progress-fill" [style.width.%]="getComputerProgress(pc.id)"></div>
+        </div>
+
+        <div class="progress-time-row">
+          <span>0:00</span>
+          <span>{{ getComputerTotalTime(pc.id) }}</span>
+        </div>
+
+        <div class="button-row">
+          <button type="button" class="btn btn-danger" (click)="openEndSessionModal(pc)">
+            End Session
+          </button>
+        </div>
+      </div>
+
+      <div class="pc-body" *ngIf="isAvailable(pc.status)">
+        <div class="info-row">
+          <span class="info-label">Status</span>
+          <span class="info-value">Ready for new session</span>
+        </div>
+
+        <div class="button-row">
+          <button type="button" class="btn btn-primary" (click)="openStartSessionModal(pc)">
+            Start Session
+          </button>
+          <button type="button" class="btn btn-secondary" (click)="setMaintenance(pc)">
+            Set Maintenance
+          </button>
+        </div>
+      </div>
+
+      <div class="pc-body" *ngIf="isMaintenance(pc.status)">
+        <div class="info-row">
+          <span class="info-label">Status</span>
+          <span class="info-value">Under maintenance</span>
+        </div>
+
+        <div class="button-row">
+          <button type="button" class="btn btn-primary" (click)="setAvailable(pc)">
+            Set Available
+          </button>
+        </div>
+      </div>
+
+      <div class="pc-body" *ngIf="pc.status === 'offline'">
+        <div class="info-row">
+          <span class="info-label">Status</span>
+          <span class="info-value">Offline</span>
+        </div>
+
+        <div class="button-row">
+          <button type="button" class="btn btn-primary" (click)="setAvailable(pc)">
+            Set Available
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" *ngIf="showAddComputerModal" (click)="closeAddComputerModal()">
+    <div class="modal-card card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Add Computer</h2>
+        <button type="button" class="close-btn" (click)="closeAddComputerModal()">✕</button>
+      </div>
+
+      <div class="modal-form">
+        <div class="field">
+          <label>Computer Name</label>
+          <input
+            class="input"
+            type="text"
+            placeholder="Example: PC-05"
+            [(ngModel)]="newComputerName"
+          />
+        </div>
+
+        <div class="field">
+          <label>Rate per Hour</label>
+          <input
+            class="input"
+            type="number"
+            placeholder="Enter hourly rate"
+            [(ngModel)]="newComputerRate"
+          />
+        </div>
+
+        <div class="field">
+          <label>Specs</label>
+          <input
+            class="input"
+            type="text"
+            placeholder="Example: Core i5 / 8GB / GTX 1050"
+            [(ngModel)]="newComputerSpecs"
+          />
+        </div>
+
+        <div class="field">
+          <label>Initial Status</label>
+          <select class="input" [(ngModel)]="newComputerStatus">
+            <option *ngFor="let status of computerStatusOptions" [value]="status">
+              {{ getComputerStatusLabel(status) }}
+            </option>
+          </select>
+        </div>
+
+        <div class="button-row modal-actions">
+          <button type="button" class="btn btn-secondary" (click)="closeAddComputerModal()">
+            Cancel
+          </button>
+          <button type="button" class="btn btn-primary" (click)="confirmAddComputer()">
+            Save Computer
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" *ngIf="showStartModal" (click)="closeStartSessionModal()">
+    <div class="modal-card card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Start Session</h2>
+        <button type="button" class="close-btn" (click)="closeStartSessionModal()">✕</button>
+      </div>
+
+      <div class="modal-form">
+        <div class="field">
+          <label>Computer</label>
+          <input class="input" [value]="selectedComputer?.name || ''" disabled />
+        </div>
+
+        <div class="field">
+          <label>Search Member</label>
+          <input
+            class="input"
+            placeholder="Type member name, phone, or email"
+            [(ngModel)]="memberSearch"
+            (input)="clearSelectedMember()"
+          />
+        </div>
+
+        <div class="member-results" *ngIf="filteredMembers.length > 0 && memberSearch.trim()">
+          <button
+            type="button"
+            class="member-result-item"
+            *ngFor="let member of filteredMembers"
+            (click)="selectMember(member)"
+          >
+            {{ member.name }} — {{ member.phone || member.email || 'No contact' }}
+          </button>
+        </div>
+
+        <div class="field" *ngIf="selectedMember">
+          <label>Selected Member</label>
+          <input class="input" [value]="selectedMember.name" disabled />
+        </div>
+
+        <div class="field">
+          <label>Walk-in Name</label>
+          <input
+            class="input"
+            placeholder="Use this if not selecting a member"
+            [(ngModel)]="walkInName"
+          />
+        </div>
+
+        <div class="field">
+          <label>Amount Paid</label>
+          <input
+            class="input"
+            type="number"
+            placeholder="Enter amount paid"
+            [(ngModel)]="amountPaid"
+          />
+        </div>
+
+        <div class="field">
+          <label>Computed Play Time</label>
+          <input class="input" [value]="computedMinutes + ' minutes'" disabled />
+        </div>
+
+        <div class="button-row modal-actions">
+          <button type="button" class="btn btn-secondary" (click)="closeStartSessionModal()">
+            Cancel
+          </button>
+          <button type="button" class="btn btn-primary" (click)="confirmStartSession()">
+            Confirm Start Session
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" *ngIf="showEndModal" (click)="closeEndSessionModal()">
+    <div class="modal-card card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>End Session</h2>
+        <button type="button" class="close-btn" (click)="closeEndSessionModal()">✕</button>
+      </div>
+
+      <div class="modal-form">
+        <div class="field">
+          <label>Computer</label>
+          <input class="input" [value]="endingComputer?.name || ''" disabled />
+        </div>
+
+        <div class="field">
+          <label>Customer</label>
+          <input
+            class="input"
+            [value]="endingComputer ? getComputerUser(endingComputer.id) : ''"
+            disabled
+          />
+        </div>
+
+        <div class="field">
+          <label>Remaining Time</label>
+          <input
+            class="input"
+            [value]="endingComputer ? getComputerRemainingTime(endingComputer.id) : '00:00'"
+            disabled
+          />
+        </div>
+
+        <p style="margin: 0; color: #555;">
+          Are you sure you want to end this session?
+        </p>
+
+        <div class="button-row modal-actions">
+          <button type="button" class="btn btn-secondary" (click)="closeEndSessionModal()">
+            Cancel
+          </button>
+          <button type="button" class="btn btn-danger" (click)="confirmEndSession()">
+            Confirm End Session
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
