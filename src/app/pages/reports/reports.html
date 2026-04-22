@@ -24,21 +24,61 @@
     </div>
 
     <div class="card chart-card">
-      <h2>Session Trends</h2>
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"
+      >
+        <h2 style="margin: 0;">Session Trends</h2>
 
-      <div class="line-chart">
+        <label class="trend-date-button">
+          <span class="calendar-icon">📅</span>
+          <span>{{ formatSelectedTrendDate() }}</span>
+          <input
+            type="date"
+            [(ngModel)]="selectedTrendDate"
+            (change)="updateSessionTrendChart()"
+            class="trend-date-native"
+          />
+        </label>
+      </div>
+
+      <div class="trend-date-caption">
+        Showing last 7 days up to {{ formatSelectedTrendDate() }}
+      </div>
+
+      <div class="line-chart enhanced-line-chart">
         <div class="line-grid"></div>
 
+        <svg class="trend-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="sessionTrendFill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="rgba(59,130,246,0.28)"></stop>
+              <stop offset="100%" stop-color="rgba(59,130,246,0.03)"></stop>
+            </linearGradient>
+          </defs>
+
+          <polygon
+            class="trend-area"
+            [attr.points]="getSessionTrendAreaPoints()"
+          ></polygon>
+
+          <polyline
+            class="trend-line"
+            [attr.points]="getSessionTrendPolylinePoints()"
+          ></polyline>
+        </svg>
+
         <div
-          class="point"
+          class="point enhanced-point"
           *ngFor="let value of sessionTrend; let i = index"
-          [style.left.%]="(i / 6) * 100"
+          [style.left.%]="getPointLeft(i)"
           [style.bottom.px]="getPointBottom(value)"
-          [attr.title]="value + ' sessions'"
-        ></div>
+          [attr.title]="sessionTrendLabels[i] + ': ' + value + ' sessions'"
+        >
+          <span class="point-badge">{{ value }}</span>
+        </div>
 
         <div class="line-labels">
-          <span *ngFor="let d of days">{{ d }}</span>
+          <span *ngFor="let d of sessionTrendLabels">{{ d }}</span>
         </div>
       </div>
     </div>

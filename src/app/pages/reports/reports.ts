@@ -1,6 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { CafeService, CafeSession, Member, Transaction } from '../../services/cafe.service';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
+import { ComputersService } from '../../services/computers.service';
+import { PaymentService } from '../../services/payment.service';
 
 interface ReportStat {
   label: string;
@@ -26,10 +29,56 @@ interface UsageSlice {
   color: string;
 }
 
+interface MemberRow {
+  id: number;
+  name: string;
+  status: string;
+  createdAt: string;
+  remainingTime: number;
+}
+
+interface TransactionRow {
+  id: number;
+  type: string;
+  amount: number;
+  memberId: number | null;
+  computerId: number | null;
+  paymentMethod: string;
+  timeAddedMinutes: number;
+  createdAt: string;
+  memberName: string;
+}
+
+interface SessionRow {
+  id: number;
+  memberId: number | null;
+  memberName: string;
+  computerId: number | null;
+  startTime: string;
+  endTime: string | null;
+  minutesPurchased: number;
+  amountPaid: number;
+  paymentMethod: string;
+  status: 'active' | 'completed';
+}
+
+interface ComputerRow {
+  id: number;
+  computerName: string;
+  status: string;
+  memberId: number | null;
+  memberName: string;
+  customerName: string;
+  timeStarted: string;
+  timeEnded: string;
+  remainingSeconds: number;
+  amountPaid: number;
+}
+
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './reports.html',
   styleUrl: './reports.scss'
 })
@@ -38,7 +87,10 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
   days: string[] = [];
   revenueBars: number[] = [];
+
   sessionTrend: number[] = [];
+  sessionTrendLabels: string[] = [];
+  selectedTrendDate = this.getTodayInputValue();
 
   activeMembers: ActiveMemberRow[] = [];
   usageDistribution: UsageSlice[] = [];
@@ -48,15 +100,22 @@ export class ReportsComponent implements OnInit, OnDestroy {
   maxSessions = 1;
 
   private refreshHandle: ReturnType<typeof setInterval> | null = null;
+  private isLoading = false;
 
-  constructor(private cafeService: CafeService) {}
+  private allSessions: SessionRow[] = [];
+
+  constructor(
+    private paymentService: PaymentService,
+    private computersService: ComputersService,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit(): void {
     this.loadReports();
 
     this.refreshHandle = setInterval(() => {
       this.loadReports();
-    }, 2000);
+    }, 3000);
   }
 
   ngOnDestroy(): void {
@@ -66,40 +125,332 @@ export class ReportsComponent implements OnInit, OnDestroy {
     }
   }
 
-  loadReports(): void {
-    const members = this.cafeService.getMembers();
-    const sessions = this.cafeService.getSessions();
-    const transactions = this.cafeService.getTransactions();
+  private getTodayInputValue(): string {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
 
-    const current7Days = this.getLastNDays(7, 0);
-    const previous7Days = this.getLastNDays(7, 7);
+  formatSelectedTrendDate(): string {
+    if (!this.selectedTrendDate) return 'Select date';
 
-    this.days = current7Days.map(day => day.label);
+    const date = new Date(this.selectedTrendDate);
+    if (Number.isNaN(date.getTime())) return 'Select date';
 
-    this.revenueBars = current7Days.map(day =>
-      transactions
-        .filter(t => this.isSameDay(new Date(t.createdAt), day.date))
-        .reduce((sum, t) => sum + t.amount, 0)
-    );
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  }
 
-    this.sessionTrend = current7Days.map(day =>
-      sessions.filter(s => this.isSameDay(new Date(s.startTime), day.date)).length
-    );
+  private normalizeArrayResponse(payload: any): any[] {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.items)) return payload.items;
+    if (Array.isArray(payload?.result)) return payload.result;
+    if (Array.isArray(payload?.members)) return payload.members;
+    if (Array.isArray(payload?.transactions)) return payload.transactions;
+    if (Array.isArray(payload?.computers)) return payload.computers;
+    return [];
+  }
 
-    this.maxRevenue = Math.max(...this.revenueBars, 1);
+  async loadReports(): Promise<void> {
+    if (this.isLoading) return;
+    this.isLoading = true;
+
+    try {
+      const [membersRes, transactionsRes, computersRes] = await Promise.all([
+        firstValueFrom(this.paymentService.getMembers()),
+        firstValueFrom(this.paymentService.getTransactions()),
+        firstValueFrom(this.computersService.getComputers())
+      ]);
+
+      const members = this.mapMembers(this.normalizeArrayResponse(membersRes));
+      const transactions = this.mapTransactions(this.normalizeArrayResponse(transactionsRes));
+      const computers = this.mapComputers(this.normalizeArrayResponse(computersRes));
+      const sessions = this.buildSessions(transactions, computers);
+
+      this.allSessions = sessions;
+
+      const current7Days = this.getLastNDays(7, 0);
+      const previous7Days = this.getLastNDays(7, 7);
+
+      this.days = current7Days.map(day => day.label);
+
+      this.revenueBars = current7Days.map(day =>
+        transactions
+          .filter(t => this.isSameDay(new Date(t.createdAt), day.date))
+          .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+      );
+
+      this.maxRevenue = Math.max(...this.revenueBars, 1);
+
+      this.updateSessionTrendChart();
+
+      this.activeMembers = this.buildActiveMembers(members, sessions);
+      this.usageDistribution = this.buildUsageDistribution(transactions, current7Days);
+      this.donutStyle = this.buildDonutStyle(this.usageDistribution);
+
+      this.stats = this.buildStats(
+        members,
+        sessions,
+        transactions,
+        computers,
+        current7Days,
+        previous7Days
+      );
+
+      this.cdr.detectChanges();
+    } catch (error) {
+      console.error('Failed to load reports:', error);
+
+      this.stats = [
+        {
+          label: 'Weekly Revenue',
+          value: this.formatPeso(0),
+          note: 'No data available',
+          icon: '💲',
+          noteClass: 'orange'
+        },
+        {
+          label: 'Total Sessions',
+          value: '0',
+          note: 'No data available',
+          icon: '📊',
+          noteClass: 'orange'
+        },
+        {
+          label: 'Active Members',
+          value: '0',
+          note: 'No data available',
+          icon: '👥',
+          noteClass: 'orange'
+        },
+        {
+          label: 'Avg. Session Time',
+          value: '0m',
+          note: 'No data available',
+          icon: '📈',
+          noteClass: 'orange'
+        }
+      ];
+
+      this.days = this.getLastNDays(7, 0).map(day => day.label);
+      this.revenueBars = [0, 0, 0, 0, 0, 0, 0];
+
+      this.allSessions = [];
+      this.sessionTrend = [];
+      this.sessionTrendLabels = [];
+
+      this.activeMembers = [];
+      this.usageDistribution = [
+        { label: 'Cash', value: 0, percent: 0, colorClass: 'cash', color: '#10b981' },
+        { label: 'GCash', value: 0, percent: 0, colorClass: 'gcash', color: '#3b82f6' },
+        { label: 'Card', value: 0, percent: 0, colorClass: 'card', color: '#f59e0b' }
+      ];
+      this.donutStyle = this.buildDonutStyle(this.usageDistribution);
+      this.maxRevenue = 1;
+      this.maxSessions = 1;
+
+      this.cdr.detectChanges();
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  updateSessionTrendChart(): void {
+    const trend = this.getTrendAroundSelectedDate(this.allSessions, this.selectedTrendDate, 7);
+    this.sessionTrendLabels = trend.labels;
+    this.sessionTrend = trend.values;
     this.maxSessions = Math.max(...this.sessionTrend, 1);
+  }
 
-    this.activeMembers = this.buildActiveMembers(members, sessions);
-    this.usageDistribution = this.buildUsageDistribution(transactions, current7Days);
-    this.donutStyle = this.buildDonutStyle(this.usageDistribution);
+  getPointLeft(index: number): number {
+    if (this.sessionTrend.length <= 1) {
+      return 50;
+    }
 
-    this.stats = this.buildStats(members, sessions, transactions, current7Days, previous7Days);
+    return (index / (this.sessionTrend.length - 1)) * 100;
+  }
+
+  getPointBottom(value: number): number {
+    return (value / this.maxSessions) * 220;
+  }
+
+  getSessionTrendPolylinePoints(): string {
+    if (!this.sessionTrend.length) return '';
+
+    return this.sessionTrend
+      .map((value, index) => {
+        const x =
+          this.sessionTrend.length === 1
+            ? 50
+            : (index / (this.sessionTrend.length - 1)) * 100;
+
+        const y = 100 - (value / this.maxSessions) * 100;
+
+        return `${x},${y}`;
+      })
+      .join(' ');
+  }
+
+  getSessionTrendAreaPoints(): string {
+    if (!this.sessionTrend.length) return '';
+
+    const linePoints = this.getSessionTrendPolylinePoints();
+    return `0,100 ${linePoints} 100,100`;
+  }
+
+  private getTrendAroundSelectedDate(
+    sessions: SessionRow[],
+    selectedDateString: string,
+    count: number
+  ): { labels: string[]; values: number[] } {
+    const endDate = selectedDateString ? new Date(selectedDateString) : new Date();
+    endDate.setHours(0, 0, 0, 0);
+
+    const ranges: Array<{ date: Date; label: string }> = [];
+
+    for (let i = count - 1; i >= 0; i--) {
+      const date = new Date(endDate);
+      date.setDate(endDate.getDate() - i);
+
+      ranges.push({
+        date,
+        label: date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric'
+        })
+      });
+    }
+
+    return {
+      labels: ranges.map(item => item.label),
+      values: ranges.map(item =>
+        sessions.filter(session =>
+          this.isSameDay(new Date(session.startTime), item.date)
+        ).length
+      )
+    };
+  }
+
+  private mapMembers(rows: any[]): MemberRow[] {
+    return rows.map((row: any) => ({
+      id: Number(row.member_id ?? row.id ?? 0),
+      name: row.name ?? row.member_name ?? 'Unknown Member',
+      status: String(row.status ?? 'active'),
+      createdAt: row.created_at ?? row.createdAt ?? '',
+      remainingTime: Number(row.remaining_time ?? row.remainingTime ?? 0)
+    }));
+  }
+
+  private mapTransactions(rows: any[]): TransactionRow[] {
+    return rows.map((row: any) => ({
+      id: Number(row.transaction_id ?? row.id ?? 0),
+      type: String(row.transaction_type ?? row.type ?? '').trim().toLowerCase(),
+      amount: Number(row.amount ?? 0),
+      memberId:
+        row.member_id !== null && row.member_id !== undefined
+          ? Number(row.member_id)
+          : null,
+      computerId:
+        row.computer_id !== null && row.computer_id !== undefined
+          ? Number(row.computer_id)
+          : null,
+      paymentMethod: String(row.payment_method ?? 'Unknown').trim() || 'Unknown',
+      timeAddedMinutes: Number(row.time_added ?? row.timeAddedMinutes ?? 0),
+      createdAt: row.transaction_date ?? row.created_at ?? row.createdAt ?? '',
+      memberName: row.member_name ?? row.name ?? 'Walk-in'
+    }));
+  }
+
+  private mapComputers(rows: any[]): ComputerRow[] {
+    return rows.map((row: any) => ({
+      id: Number(row.computer_id ?? row.id ?? 0),
+      computerName: row.computer_name ?? row.name ?? `PC-${row.computer_id ?? row.id ?? ''}`,
+      status: String(row.status ?? 'available'),
+      memberId:
+        row.member_id !== null && row.member_id !== undefined
+          ? Number(row.member_id)
+          : null,
+      memberName: row.member_name ?? '',
+      customerName: row.customer_name ?? '',
+      timeStarted: row.time_started ?? '',
+      timeEnded: row.time_ended ?? '',
+      remainingSeconds: Number(row.remaining_seconds ?? 0),
+      amountPaid: Number(row.amount_paid ?? 0)
+    }));
+  }
+
+  private buildSessions(transactions: TransactionRow[], computers: ComputerRow[]): SessionRow[] {
+    const sessions: SessionRow[] = [];
+
+    const sessionStarts = transactions.filter(
+      transaction => transaction.type === 'session_start' || transaction.type === 'session_payment'
+    );
+
+    for (const transaction of sessionStarts) {
+      sessions.push({
+        id: transaction.id,
+        memberId: transaction.memberId,
+        memberName: transaction.memberName || 'Walk-in',
+        computerId: transaction.computerId,
+        startTime: transaction.createdAt,
+        endTime: null,
+        minutesPurchased: Number(transaction.timeAddedMinutes || 0),
+        amountPaid: Number(transaction.amount || 0),
+        paymentMethod: transaction.paymentMethod || 'Unknown',
+        status: 'completed'
+      });
+    }
+
+    const activeComputers = computers.filter(
+      computer =>
+        String(computer.status).toLowerCase() === 'occupied' &&
+        !!computer.timeStarted
+    );
+
+    for (const computer of activeComputers) {
+      const alreadyExists = sessions.some(session => {
+        if (session.computerId !== computer.id) return false;
+
+        const sessionDate = new Date(session.startTime).getTime();
+        const computerDate = new Date(computer.timeStarted).getTime();
+
+        return Math.abs(sessionDate - computerDate) < 60 * 1000;
+      });
+
+      if (alreadyExists) {
+        continue;
+      }
+
+      sessions.push({
+        id: Number(`9${computer.id}${Date.now()}`),
+        memberId: computer.memberId,
+        memberName: computer.memberName || computer.customerName || 'Walk-in',
+        computerId: computer.id,
+        startTime: computer.timeStarted,
+        endTime: computer.timeEnded || null,
+        minutesPurchased: Math.floor((computer.remainingSeconds || 0) / 60),
+        amountPaid: Number(computer.amountPaid || 0),
+        paymentMethod: 'Unknown',
+        status: 'active'
+      });
+    }
+
+    return sessions.sort(
+      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+    );
   }
 
   buildStats(
-    members: Member[],
-    sessions: CafeSession[],
-    transactions: Transaction[],
+    members: MemberRow[],
+    sessions: SessionRow[],
+    transactions: TransactionRow[],
+    computers: ComputerRow[],
     current7Days: Array<{ date: Date; label: string }>,
     previous7Days: Array<{ date: Date; label: string }>
   ): ReportStat[] {
@@ -107,31 +458,34 @@ export class ReportsComponent implements OnInit, OnDestroy {
     const previousRevenue = this.sumRevenueForDays(transactions, previous7Days);
 
     const currentSessions = this.countSessionsForDays(sessions, current7Days);
-    const previousSessions = this.countSessionsForDays(sessions, previous7Days);
-
-    const activeMembers = members.filter(member => member.status === 'active').length;
+    const activeMembers = members.filter(
+      member => String(member.status).toLowerCase() === 'active'
+    ).length;
 
     const currentAvgMinutes = this.getAverageSessionMinutesForDays(sessions, current7Days);
     const previousAvgMinutes = this.getAverageSessionMinutesForDays(sessions, previous7Days);
 
     const revenueDiff = this.getPercentChange(currentRevenue, previousRevenue);
-    const sessionDiff = this.getPercentChange(currentSessions, previousSessions);
     const avgMinuteDiff = Math.round(currentAvgMinutes - previousAvgMinutes);
+
+    const liveOccupied = computers.filter(
+      computer => String(computer.status).toLowerCase() === 'occupied'
+    ).length;
 
     return [
       {
         label: 'Weekly Revenue',
         value: this.formatPeso(currentRevenue),
         note: this.buildChangeText(revenueDiff, 'vs previous 7 days'),
-        icon: '💲',
+        icon: '₱',
         noteClass: revenueDiff >= 0 ? 'green' : 'orange'
       },
       {
         label: 'Total Sessions',
         value: currentSessions.toString(),
-        note: this.buildChangeText(sessionDiff, 'vs previous 7 days'),
+        note: `${liveOccupied} live occupied computer${liveOccupied === 1 ? '' : 's'}`,
         icon: '📊',
-        noteClass: sessionDiff >= 0 ? 'blue' : 'orange'
+        noteClass: 'blue'
       },
       {
         label: 'Active Members',
@@ -150,29 +504,29 @@ export class ReportsComponent implements OnInit, OnDestroy {
     ];
   }
 
-  buildActiveMembers(members: Member[], sessions: CafeSession[]): ActiveMemberRow[] {
-    const sessionMap = new Map<number, { name: string; sessions: number; minutes: number }>();
+  buildActiveMembers(members: MemberRow[], sessions: SessionRow[]): ActiveMemberRow[] {
+    const memberMap = new Map<number, { name: string; sessions: number; minutes: number }>();
 
     for (const session of sessions) {
-      if (session.memberId === null) continue;
+      if (session.memberId === null || session.memberId === undefined) continue;
 
       const member = members.find(m => m.id === session.memberId);
-      if (!member) continue;
+      const memberName = member?.name || session.memberName || 'Unknown Member';
 
-      if (!sessionMap.has(member.id)) {
-        sessionMap.set(member.id, {
-          name: member.name,
+      if (!memberMap.has(session.memberId)) {
+        memberMap.set(session.memberId, {
+          name: memberName,
           sessions: 0,
           minutes: 0
         });
       }
 
-      const entry = sessionMap.get(member.id)!;
+      const entry = memberMap.get(session.memberId)!;
       entry.sessions += 1;
-      entry.minutes += session.minutesPurchased || 0;
+      entry.minutes += Number(session.minutesPurchased || 0);
     }
 
-    const rows = Array.from(sessionMap.values())
+    const rows = Array.from(memberMap.values())
       .sort((a, b) => {
         if (b.sessions !== a.sessions) return b.sessions - a.sessions;
         return b.minutes - a.minutes;
@@ -191,7 +545,7 @@ export class ReportsComponent implements OnInit, OnDestroy {
   }
 
   buildUsageDistribution(
-    transactions: Transaction[],
+    transactions: TransactionRow[],
     current7Days: Array<{ date: Date; label: string }>
   ): UsageSlice[] {
     const currentTransactions = transactions.filter(t =>
@@ -202,13 +556,14 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
     for (const transaction of currentTransactions) {
       const method = (transaction.paymentMethod || 'Unknown').trim() || 'Unknown';
-      methodTotals.set(method, (methodTotals.get(method) || 0) + transaction.amount);
+      methodTotals.set(method, (methodTotals.get(method) || 0) + Number(transaction.amount || 0));
     }
 
     const colorMap: Record<string, { colorClass: string; color: string }> = {
       Cash: { colorClass: 'cash', color: '#10b981' },
       GCash: { colorClass: 'gcash', color: '#3b82f6' },
       Card: { colorClass: 'card', color: '#f59e0b' },
+      System: { colorClass: 'unknown', color: '#94a3b8' },
       Unknown: { colorClass: 'unknown', color: '#94a3b8' }
     };
 
@@ -271,22 +626,28 @@ export class ReportsComponent implements OnInit, OnDestroy {
     return days;
   }
 
-  sumRevenueForDays(transactions: Transaction[], days: Array<{ date: Date; label: string }>): number {
+  sumRevenueForDays(
+    transactions: TransactionRow[],
+    days: Array<{ date: Date; label: string }>
+  ): number {
     return transactions
       .filter(transaction =>
         days.some(day => this.isSameDay(new Date(transaction.createdAt), day.date))
       )
-      .reduce((sum, transaction) => sum + transaction.amount, 0);
+      .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
   }
 
-  countSessionsForDays(sessions: CafeSession[], days: Array<{ date: Date; label: string }>): number {
+  countSessionsForDays(
+    sessions: SessionRow[],
+    days: Array<{ date: Date; label: string }>
+  ): number {
     return sessions.filter(session =>
       days.some(day => this.isSameDay(new Date(session.startTime), day.date))
     ).length;
   }
 
   getAverageSessionMinutesForDays(
-    sessions: CafeSession[],
+    sessions: SessionRow[],
     days: Array<{ date: Date; label: string }>
   ): number {
     const filtered = sessions.filter(session =>
@@ -295,7 +656,11 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
     if (filtered.length === 0) return 0;
 
-    const totalMinutes = filtered.reduce((sum, session) => sum + (session.minutesPurchased || 0), 0);
+    const totalMinutes = filtered.reduce(
+      (sum, session) => sum + Number(session.minutesPurchased || 0),
+      0
+    );
+
     return totalMinutes / filtered.length;
   }
 
@@ -325,10 +690,6 @@ export class ReportsComponent implements OnInit, OnDestroy {
 
   getBarHeight(value: number): number {
     return (value / this.maxRevenue) * 260;
-  }
-
-  getPointBottom(value: number): number {
-    return (value / this.maxSessions) * 220;
   }
 
   formatPeso(amount: number): string {
