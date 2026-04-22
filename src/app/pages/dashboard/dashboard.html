@@ -1,13 +1,13 @@
 <div class="container">
   <div class="dashboard-header">
     <div>
-      <h1 class="page-title">Dashboard</h1>
+      <h1 class="page-title">Home</h1>
       <p class="page-subtitle">Welcome back! Here's what's happening today.</p>
     </div>
 
     <div class="dashboard-status">
       <span class="live-dot"></span>
-      <span class="live-text">Live Dashboard</span>
+      <span class="live-text">Live Updates</span>
     </div>
   </div>
 
@@ -30,35 +30,89 @@
     </div>
   </div>
 
-  <div class="card activity-card">
-    <div class="section-header">
-      <h2>Recent Activity</h2>
-      <span class="section-badge">Monitor</span>
+  <!-- CAFÉ SHOWCASE -->
+  <div class="showcase-block">
+    <div class="menu-header">
+      <div>
+        <h2 class="showcase-title">Café Showcase</h2>
+        <p class="showcase-subtitle">
+          Explore our partnered hardware and featured games.
+        </p>
+      </div>
     </div>
 
-    <div class="activity-list" *ngIf="activity.length > 0; else emptyActivity">
-      <div class="activity-item" *ngFor="let a of activity">
-        <div class="activity-left">
-          <div class="activity-icon" [ngClass]="a.type">
-            {{ a.icon }}
-          </div>
+    <div class="slideshow-card">
+      <div class="slide-image-wrap">
+        <img
+          [src]="slides[currentSlide].image"
+          [alt]="slides[currentSlide].title"
+          class="slide-image"
+        />
 
-          <div>
-            <div class="activity-name">{{ a.name }}</div>
-            <div class="activity-text">{{ a.text }}</div>
+        <div class="slide-overlay">
+          <span class="slide-tag">{{ slides[currentSlide].category }}</span>
+          <h2 class="slide-title">{{ slides[currentSlide].title }}</h2>
+          <p class="slide-description">
+            {{ slides[currentSlide].description }}
+          </p>
+        </div>
+      </div>
+
+      <button class="nav-btn prev-btn" type="button" (click)="prevSlide()">❮</button>
+      <button class="nav-btn next-btn" type="button" (click)="nextSlide()">❯</button>
+    </div>
+
+    <div class="dots">
+      <button
+        type="button"
+        class="dot"
+        *ngFor="let slide of slides; let i = index"
+        [class.active]="i === currentSlide"
+        (click)="goToSlide(i)"
+      ></button>
+    </div>
+
+    <!-- HARDWARE -->
+    <div class="section-block">
+      <div class="section-header">
+        <h2>Partnered Hardware</h2>
+        <p>Powered by trusted gaming and computer hardware brands</p>
+      </div>
+
+      <div class="card-grid">
+        <div class="info-card" *ngFor="let brand of computerBrands">
+          <img
+            [src]="brand.image"
+            [alt]="brand.name"
+            class="card-image hardware-image"
+          />
+
+          <div class="card-body">
+            <h3 class="card-title">{{ brand.name }}</h3>
+            <p class="card-text">{{ brand.description }}</p>
           </div>
         </div>
-
-        <div class="activity-time">{{ a.time }}</div>
       </div>
     </div>
 
-    <ng-template #emptyActivity>
-      <div class="empty-state">
-        <div class="empty-icon">📡</div>
-        <div class="empty-title">No recent activity yet</div>
-        <div class="empty-text">New member, payment, and session events will appear here once connected.</div>
+    <!-- GAMES -->
+    <div class="section-block">
+      <div class="section-header">
+        <h2>Featured Games</h2>
+        <p>Popular games our customers enjoy</p>
       </div>
-    </ng-template>
+
+      <div class="card-grid">
+        <div class="info-card" *ngFor="let game of featuredGames">
+          <img [src]="game.image" [alt]="game.name" class="card-image" />
+
+          <div class="card-body">
+            <h3 class="card-title">{{ game.name }}</h3>
+            <p class="card-text">{{ game.description }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>

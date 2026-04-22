@@ -11,6 +11,7 @@ interface Member {
   email?: string;
   remainingTime: number;
   status: 'active' | 'inactive' | 'blocked' | string;
+  isUsing?: boolean;
   createdAt: string;
 }
 
@@ -29,6 +30,11 @@ export class MembersComponent implements OnInit {
   email = '';
 
   members: Member[] = [];
+  filteredMembers: Member[] = [];
+
+  searchTerm = '';
+  selectedStatus = 'all';
+
   isSubmitting = false;
 
   constructor(
@@ -40,6 +46,9 @@ export class MembersComponent implements OnInit {
     this.loadMembers();
   }
 
+  // ===============================
+  // LOAD MEMBERS
+  // ===============================
   loadMembers(): void {
     this.memberService.getMembers().subscribe({
       next: (res) => {
@@ -52,19 +61,70 @@ export class MembersComponent implements OnInit {
           email: row.email || '',
           remainingTime: Number(row.remaining_time || 0),
           status: row.status || 'active',
+          isUsing: Boolean(row.is_using || false),
           createdAt: row.created_at || ''
         }));
 
+        this.applyFilters();
         this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('Failed to load members:', err);
         this.members = [];
+        this.filteredMembers = [];
         this.cdr.detectChanges();
       }
     });
   }
 
+  // ===============================
+  // SEARCH + FILTER
+  // ===============================
+  onSearchChange(): void {
+    this.applyFilters();
+  }
+
+  onStatusChange(): void {
+    this.applyFilters();
+  }
+
+  applyFilters(): void {
+    const term = this.searchTerm.toLowerCase().trim();
+
+    this.filteredMembers = this.members.filter((member) => {
+      const computedStatus = this.getComputedStatus(member).toLowerCase();
+
+      const matchesSearch =
+        !term ||
+        String(member.id).toLowerCase().includes(term) ||
+        (member.name || '').toLowerCase().includes(term) ||
+        (member.phone || '').toLowerCase().includes(term) ||
+        (member.email || '').toLowerCase().includes(term);
+
+      const matchesStatus =
+        this.selectedStatus === 'all' ||
+        computedStatus === this.selectedStatus.toLowerCase();
+
+      return matchesSearch && matchesStatus;
+    });
+  }
+
+  // ===============================
+  // FINAL STATUS LOGIC
+  // ===============================
+  getComputedStatus(m: Member): string {
+    const backendStatus = (m.status || '').toLowerCase();
+
+    if (backendStatus === 'blocked') return 'blocked';
+    if (m.remainingTime <= 0) return 'inactive';
+    if (m.isUsing) return 'in-use';
+
+    return 'active';
+  }
+
+  // ===============================
+  // MODAL
+  // ===============================
   openModal(): void {
     this.showModal = true;
     this.cdr.detectChanges();
@@ -83,6 +143,9 @@ export class MembersComponent implements OnInit {
     this.isSubmitting = false;
   }
 
+  // ===============================
+  // ADD MEMBER
+  // ===============================
   addMember(): void {
     if (this.isSubmitting) return;
 
@@ -113,10 +176,12 @@ export class MembersComponent implements OnInit {
             email: row.email || '',
             remainingTime: Number(row.remaining_time || 0),
             status: row.status || 'active',
+            isUsing: Boolean(row.is_using || false),
             createdAt: row.created_at || ''
           };
 
           this.members = [newMember, ...this.members];
+          this.applyFilters();
         } else {
           this.loadMembers();
           return;
@@ -135,6 +200,9 @@ export class MembersComponent implements OnInit {
     });
   }
 
+  // ===============================
+  // DELETE MEMBER
+  // ===============================
   deleteMember(id: number): void {
     const confirmed = window.confirm('Are you sure you want to delete this member?');
     if (!confirmed) return;
@@ -142,6 +210,7 @@ export class MembersComponent implements OnInit {
     this.memberService.deleteMember(id).subscribe({
       next: () => {
         this.members = this.members.filter(member => member.id !== id);
+        this.applyFilters();
         this.cdr.detectChanges();
       },
       error: (err) => {
@@ -151,6 +220,9 @@ export class MembersComponent implements OnInit {
     });
   }
 
+  // ===============================
+  // TOP UP
+  // ===============================
   addTopUp(id: number): void {
     const input = window.prompt('Enter top-up amount in minutes:');
     if (input === null) return;
@@ -183,10 +255,13 @@ export class MembersComponent implements OnInit {
                   email: updatedMember.email || '',
                   remainingTime: Number(updatedMember.remaining_time || 0),
                   status: updatedMember.status || 'active',
+                  isUsing: Boolean(updatedMember.is_using || false),
                   createdAt: updatedMember.created_at || ''
                 }
               : member
           );
+
+          this.applyFilters();
         } else {
           this.loadMembers();
           return;
@@ -201,6 +276,17 @@ export class MembersComponent implements OnInit {
     });
   }
 
+  // ===============================
+  // OPTIONAL: DEMO USAGE TOGGLE
+  // ===============================
+  toggleUsage(m: Member): void {
+    m.isUsing = !m.isUsing;
+    this.applyFilters();
+  }
+
+  // ===============================
+  // FORMAT TIME
+  // ===============================
   formatRemainingTime(totalSeconds: number): string {
     const safeSeconds = Math.max(0, Number(totalSeconds || 0));
 
@@ -215,11 +301,17 @@ export class MembersComponent implements OnInit {
     return `${minutes}m ${seconds}s`;
   }
 
+  // ===============================
+  // STATUS STYLE
+  // ===============================
   getStatusClass(status: string): string {
     const value = (status || '').toLowerCase();
+
     if (value === 'active') return 'active';
     if (value === 'inactive') return 'low';
     if (value === 'blocked') return 'expired';
+    if (value === 'in-use') return 'in-use';
+
     return '';
   }
 }
